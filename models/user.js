@@ -32,11 +32,11 @@ const userSchema = new mongoose.Schema(
     email: { type: String, unique: true, sparse: true },
     isPhoneVerified: { type: Boolean, default: false },
     verified: { type: Boolean, default: false },
-    building: {
+    building: [{
       type: String,
       required: false,
       trim: true,
-    },
+    }],
     role: {
       type: String,
       enum: ["user", "admin", "technician", "partner"],
