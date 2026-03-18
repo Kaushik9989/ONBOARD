@@ -52,6 +52,8 @@ app.post("/send-otp", async (req, res) => {
   }
 });
 
+
+
 // VERIFY OTP + REGISTER
 app.post("/verify-otp-and-register", async (req, res) => {
   try {
@@ -74,7 +76,7 @@ app.post("/verify-otp-and-register", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid or expired OTP. Please try again." });
     }
 
-    const THIS_BUILDING = "Harsha AVK";
+    const THIS_BUILDING = "AVK Harsha";
     const existingUser = await User.findOne({ phone: cleanPhone });
 
     if (existingUser) {
