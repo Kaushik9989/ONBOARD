@@ -60,7 +60,7 @@ app.post("/verify-otp-and-register", async (req, res) => {
     const { username, phone, otp } = req.body;
     if (!username || !phone || !otp) {
       return res.status(400).json({ success: false, message: "Name, phone, and OTP are all required" });
-    }
+    }  
 
     const cleanPhone = normalizePhone(phone);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
