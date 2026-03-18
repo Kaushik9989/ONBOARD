@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0b09" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Droppoint — Join</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --orange:      #ff6b1a;
+      --orange-dim:  rgba(255,107,26,0.15);
+      --orange-glow: rgba(255,107,26,0.35);
+      --orange-deep: #c44d00;
+      --black:       #0c0b09;
+      --black-3:     #1d1a15;
+      --white:       #ffffff;
+      --w60:         rgba(255,255,255,0.60);
+      --w30:         rgba(255,255,255,0.30);
+      --w10:         rgba(255,255,255,0.10);
+      --w06:         rgba(255,255,255,0.06);
+      --success:     #4ade80;
+      --error:       #ff5757;
+      --fd:          'Bebas Neue', sans-serif;
+      --fb:          'Outfit', sans-serif;
+    }
+
+    html {
+      height: 100%;
+      background: var(--black);
+    }
+
+    body {
+      font-family: var(--fb);
+      background: var(--black);
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* ── BACKGROUND ────────────────────────────────── */
+    .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .bg::before {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,107,26,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,107,26,0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridDrift 24s linear infinite;
+    }
+    @keyframes gridDrift { to { background-position: 40px 40px; } }
+
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+    .orb-1 {
+      width: 340px; height: 340px;
+      background: radial-gradient(circle, rgba(255,107,26,0.38) 0%, transparent 70%);
+      top: -100px; right: -80px;
+      animation: breathe 9s ease-in-out infinite alternate;
+    }
+    .orb-2 {
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(255,107,26,0.18) 0%, transparent 70%);
+      bottom: 10%; left: -80px;
+      animation: breathe 13s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes breathe { to { transform: scale(1.2) translate(12px,-12px); } }
+
+    .particle {
+      position: fixed; width: 2px; height: 2px;
+      border-radius: 50%; background: var(--orange); opacity: 0;
+      animation: floatUp var(--dur) var(--delay) ease-in infinite;
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(0) translateX(0); opacity: 0; }
+      15%  { opacity: 0.7; }
+      85%  { opacity: 0.2; }
+      100% { transform: translateY(-100px) translateX(var(--dx)); opacity: 0; }
+    }
+
+    /* ── SCREEN ─────────────────────────────────────── */
+    .screen {
+      position: relative; z-index: 10;
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column;
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* ── HERO (top) ─────────────────────────────────── */
+    .hero {
+      flex: 0 0 auto;
+      padding: 44px 24px 24px;
+      animation: fadeUp 0.7s 0.1s both;
+    }
+
+    .brand-row {
+      display: flex; align-items: center; gap: 11px;
+      margin-bottom: 24px;
+    }
+    .brand-icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      background: var(--orange-dim); border: 1px solid var(--orange-glow);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .brand-icon svg { width: 20px; height: 20px; }
+    .brand-name {
+      font-family: var(--fd); font-size: 18px;
+      letter-spacing: 2px; color: var(--white); line-height: 1;
+    }
+    .brand-sub {
+      font-size: 10px; font-weight: 400; color: var(--w60);
+      letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px;
+    }
+
+    .main-title {
+      font-family: var(--fd);
+      font-size: clamp(58px, 17vw, 84px);
+      letter-spacing: 3px; line-height: 0.9;
+      margin-bottom: 12px;
+    }
+    .t-white { color: var(--white); }
+    .t-orange { color: var(--orange); }
+
+    .hero-desc {
+      font-size: 14px; font-weight: 300;
+      color: var(--w60); line-height: 1.6; max-width: 290px;
+    }
+
+    .progress-wrap { margin-top: 22px; }
+    .progress-labels {
+      display: flex; justify-content: space-between;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--w30); margin-bottom: 7px;
+    }
+    .progress-labels .active { color: var(--orange); }
+    .progress-track {
+      height: 2px; background: var(--w06);
+      border-radius: 99px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--orange), var(--orange-deep));
+      border-radius: 99px; width: 50%;
+      transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+      position: relative; overflow: hidden;
+    }
+    .progress-fill::after {
+      content: ''; position: absolute; top: 0; left: -60%;
+      width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+      animation: shimmer 2.2s infinite;
+    }
+    @keyframes shimmer { to { left: 130%; } }
+
+    /* ── SHEET (bottom) ─────────────────────────────── */
+    .sheet {
+      flex: 1;
+      background: linear-gradient(180deg, transparent 0%, rgba(12,11,9,0.95) 14%);
+      padding: 4px 24px calc(env(safe-area-inset-bottom, 0px) + 32px);
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+
+    .step { display: none; }
+    .step.active {
+      display: block;
+      animation: stepIn 0.4s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes stepIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── INPUTS ─────────────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+    .field-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--w60); margin-bottom: 8px;
+    }
+    .field-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+
+    .input-wrap { position: relative; }
+    .input-icon {
+      position: absolute; left: 15px; top: 50%;
+      transform: translateY(-50%); color: var(--w30);
+      pointer-events: none; transition: color 0.2s;
+    }
+    .input-wrap:focus-within .input-icon { color: var(--orange); }
+
+    input[type="text"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 16px 16px 16px 46px;
+      background: var(--black-3);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      font-family: var(--fb); font-size: 16px; font-weight: 400;
+      color: var(--white); outline: none;
+      caret-color: var(--orange); -webkit-appearance: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    input[type="text"]:focus,
+    input[type="tel"]:focus {
+      border-color: var(--orange);
+      background: #201c15;
+      box-shadow: 0 0 0 3px rgba(255,107,26,0.12);
+    }
+    input::placeholder { color: rgba(255,255,255,0.18); }
+    .field-hint { font-size: 11px; color: var(--w30); margin-top: 6px; padding-left: 2px; }
+
+    /* OTP */
+    .otp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .otp-grid input {
+      padding: 14px 4px; text-align: center;
+      font-size: 22px; font-weight: 600; border-radius: 12px;
+    }
+    .otp-grid input:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,107,26,0.15);
+      transform: translateY(-2px);
+    }
+    .otp-grid input.filled { border-color: rgba(255,107,26,0.45); color: var(--orange); }
+
+    .otp-dest {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--orange-dim);
+      border: 1px solid rgba(255,107,26,0.2);
+      border-radius: 10px; padding: 11px 14px;
+      margin-bottom: 18px;
+      font-size: 13px; color: var(--w60);
+    }
+    .otp-dest strong { color: var(--white); font-weight: 500; }
+    .otp-dest svg { flex-shrink: 0; color: var(--orange); }
+
+    .resend-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .timer-text { font-size: 12px; color: var(--w30); }
+    .timer-text span { color: var(--orange); font-variant-numeric: tabular-nums; }
+    .resend-btn {
+      background: none; border: none;
+      font-family: var(--fb); font-size: 12px; font-weight: 500;
+      color: var(--orange); cursor: pointer; padding: 4px 0;
+      text-decoration: underline; text-underline-offset: 3px;
+      opacity: 0.35; transition: opacity 0.2s; touch-action: manipulation;
+    }
+    .resend-btn:not(:disabled) { opacity: 1; }
+    .resend-btn:disabled { cursor: not-allowed; }
+
+    /* ── BUTTONS ─────────────────────────────────────── */
+    .btn {
+      width: 100%; border: none; border-radius: 14px;
+      font-family: var(--fd); font-size: 20px; letter-spacing: 1.5px;
+      cursor: pointer; touch-action: manipulation;
+      min-height: 54px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.12s, box-shadow 0.18s, opacity 0.18s;
+      position: relative; overflow: hidden;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%);
+      color: var(--white);
+      box-shadow: 0 6px 24px rgba(255,107,26,0.38);
+      margin-top: 20px;
+    }
+    .btn-primary:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(255,107,26,0.25); }
+    .btn-primary:disabled { opacity: 0.4; }
+    .btn-primary::after {
+      content: ''; position: absolute; top: 0; left: -80%;
+      width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      transform: skewX(-18deg);
+      animation: btnShimmer 2.8s 1.2s infinite;
+    }
+    @keyframes btnShimmer { to { left: 160%; } }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--w60); font-family: var(--fb);
+      font-size: 14px; font-weight: 500; letter-spacing: 0.02em;
+      margin-top: 10px;
+    }
+    .btn-ghost:active { background: var(--w06); }
+
+    a.btn-explore {
+      text-decoration: none;
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%);
+      color: var(--white);
+      box-shadow: 0 6px 24px rgba(255,107,26,0.38);
+      margin-top: 24px;
+      animation: fadeUp 0.5s 1s both;
+    }
+    a.btn-explore:active { transform: scale(0.97); }
+
+    .spinner {
+      display: inline-block; width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MESSAGES ─────────────────────────────────────── */
+    .msg {
+      margin-top: 12px; padding: 12px 16px;
+      border-radius: 11px; font-size: 13px;
+      text-align: center; display: none;
+      animation: fadeUp 0.3s ease both;
+    }
+    .msg.show { display: block; }
+    .msg.success { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: var(--success); }
+    .msg.error   { background: rgba(255,87,87,0.1);  border: 1px solid rgba(255,87,87,0.25);  color: var(--error); }
+
+    /* ── SUCCESS ──────────────────────────────────────── */
+    .success-wrap { text-align: center; padding: 8px 0 4px; }
+    .success-ring {
+      width: 84px; height: 84px; border-radius: 50%;
+      margin: 0 auto 20px; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .success-ring::before {
+      content: ''; position: absolute; inset: 0; border-radius: 50%;
+      background: rgba(255,107,26,0.12); border: 1px solid rgba(255,107,26,0.3);
+      animation: ringPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    .success-ring::after {
+      content: ''; position: absolute; inset: -9px; border-radius: 50%;
+      border: 1px solid rgba(255,107,26,0.1);
+      animation: ringPop 0.5s 0.1s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes ringPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .success-ring svg {
+      position: relative; z-index: 1;
+      animation: checkIn 0.4s 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes checkIn { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+    .success-title {
+      font-family: var(--fd);
+      font-size: clamp(36px, 11vw, 52px);
+      letter-spacing: 2px; color: var(--white);
+      animation: fadeUp 0.5s 0.5s both; line-height: 1;
+    }
+    .success-title span { color: var(--orange); }
+    .success-body {
+      font-size: 14px; font-weight: 300; color: var(--w60);
+      line-height: 1.6; margin-top: 10px;
+      animation: fadeUp 0.5s 0.65s both;
+    }
+    .meta-pills {
+      display: flex; gap: 8px; justify-content: center;
+      margin-top: 16px; flex-wrap: wrap;
+      animation: fadeUp 0.5s 0.8s both;
+    }
+    .meta-pill {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--black-3); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 99px; padding: 6px 14px;
+      font-size: 11px; color: var(--w60);
+    }
+    .meta-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+
+    /* ── DESKTOP ──────────────────────────────────────── */
+    @media (min-width: 560px) {
+      .screen { align-items: center; justify-content: center; padding: 40px 20px; }
+      .card-wrap {
+        width: 100%; max-width: 450px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 26px; overflow: hidden;
+        backdrop-filter: blur(32px) saturate(140%);
+        -webkit-backdrop-filter: blur(32px) saturate(140%);
+        box-shadow: 0 0 0 0.5px rgba(255,107,26,0.1) inset, 0 32px 80px rgba(0,0,0,0.7);
+        animation: cardIn 0.8s cubic-bezier(0.22,1,0.36,1) both;
+      }
+      @keyframes cardIn { from { opacity:0; transform: translateY(28px) scale(0.96); } to { opacity:1; transform:none; } }
+      .hero { padding: 40px 38px 24px; }
+      .sheet { padding: 4px 38px 36px; }
+      .card-accent { height: 3px; background: linear-gradient(90deg, transparent, var(--orange) 40%, var(--orange-deep) 70%, transparent); animation: ap 3s ease-in-out infinite; }
+      @keyframes ap { 0%,100% { opacity:0.75; } 50% { opacity:1; } }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+</div>
+
+<div class="screen">
+  <div class="card-wrap">
+    <div class="card-accent"></div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="brand-row">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ff6b1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <path d="M9 22V12h6v10"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Harsha AVK</div>
+          <div class="brand-sub">Resident Portal</div>
+        </div>
+      </div>
+
+      <div class="main-title">
+        <span class="t-white">DROP</span><span class="t-orange">POINT</span>
+      </div>
+      <p class="hero-desc">Join your building community. Manage parcels, services &amp; more — all in one place.</p>
+
+      <div class="progress-wrap">
+        <div class="progress-labels">
+          <span id="label1" class="active">Identity</span>
+          <span id="label2">Verify</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHEET -->
+    <div class="sheet">
+
+      <!-- Step 1 -->
+      <div class="step active" id="step1">
+        <div class="form-group">
+          <div class="field-label"><span class="field-dot"></span>Full Name</div>
+          <div class="input-wrap">
+            <span class="input-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+            </span>
+            <input type="text" id="username" autocomplete="name" autocorrect="off" spellcheck="false" />
+          </div>
+          <div class="field-hint">As it appears on your ID</div>
+        </div>
+
+        <div class="form-group">
+          <div class="field-label"><span class="field-dot"></span>Mobile Number</div>
+          <div class="input-wrap">
+            <span class="input-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+              </svg>
+            </span>
+            <input type="tel" id="phone" autocomplete="tel" inputmode="numeric" maxlength="13" />
+          </div>
+          <div class="field-hint">10-digit Indian number — we'll send a code</div>
+        </div>
+
+        <button class="btn btn-primary" id="sendOtpBtn" onclick="sendOtp()">Continue</button>
+        <div id="msg1" class="msg"></div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step" id="step2">
+        <div class="otp-dest">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+          Code sent to <strong id="phoneMask"></strong>
+        </div>
+
+        <div class="form-group">
+          <div class="field-label"><span class="field-dot"></span>One-Time Code</div>
+          <div class="otp-grid">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="one-time-code" />
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+          </div>
+        </div>
+
+        <div class="resend-row">
+          <span class="timer-text" id="timerWrap">Resend in <span id="countdown">30</span>s</span>
+          <button class="resend-btn" id="resendBtn" disabled onclick="resendOtp()">Resend code</button>
+        </div>
+
+        <button class="btn btn-primary" id="verifyBtn" onclick="verifyOtp()">Verify &amp; Register</button>
+        <button class="btn btn-ghost" onclick="goBack()">← Change number</button>
+        <div id="msg2" class="msg"></div>
+      </div>
+
+      <!-- Success -->
+      <div class="step" id="successScreen">
+        <div class="success-wrap">
+          <div class="success-ring" id="successRing">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ff6b1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline id="successIcon" points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div class="success-title" id="successTitle">WELCOME<br><span id="welcomeName"></span></div>
+          <p class="success-body" id="successBody">Your account is verified and ready.<br>You're now part of the Harsha AVK community.</p>
+          <div class="meta-pills" id="successPills">
+            <div class="meta-pill"><span class="dot"></span>Verified resident</div>
+            <div class="meta-pill"><span class="dot"></span>Harsha AVK</div>
+          </div>
+          <a href="https://droppoint-ui.onrender.com/" class="btn btn-explore">Explore Droppoint →</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  /* particles */
+  for (let i = 0; i < 14; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.setProperty('--dur',   (7 + Math.random() * 8) + 's');
+    p.style.setProperty('--delay', (Math.random() * 12)    + 's');
+    p.style.setProperty('--dx',    (Math.random() * 50 - 25) + 'px');
+    p.style.left = (Math.random() * 100) + 'vw';
+    p.style.top  = (50 + Math.random() * 45) + 'vh';
+    document.body.appendChild(p);
+  }
+
+  let cdTimer = null;
+
+  /* OTP boxes */
+  const otpInputs = document.querySelectorAll('.otp-input');
+  otpInputs.forEach((inp, i) => {
+    inp.addEventListener('input', e => {
+      const v = e.target.value.replace(/\D/, '');
+      e.target.value = v;
+      e.target.classList.toggle('filled', !!v);
+      if (v && i < otpInputs.length - 1) otpInputs[i + 1].focus();
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !inp.value && i > 0) {
+        otpInputs[i - 1].value = '';
+        otpInputs[i - 1].classList.remove('filled');
+        otpInputs[i - 1].focus();
+      }
+    });
+    inp.addEventListener('paste', e => {
+      e.preventDefault();
+      const digits = (e.clipboardData || window.clipboardData)
+        .getData('text').replace(/\D/g, '').slice(0, 6);
+      [...digits].forEach((ch, idx) => {
+        if (otpInputs[i + idx]) { otpInputs[i + idx].value = ch; otpInputs[i + idx].classList.add('filled'); }
+      });
+      const next = [...otpInputs].findIndex(el => !el.value);
+      if (next !== -1) otpInputs[next].focus();
+    });
+  });
+
+  function getOtp() { return [...otpInputs].map(i => i.value).join(''); }
+  function normalizePhone(raw) {
+    return String(raw).trim().replace(/\s+/g, '')
+      .replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+  }
+  function showMsg(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text; el.className = 'msg ' + type + ' show';
+  }
+  function hideMsg(id) { document.getElementById(id).className = 'msg'; }
+  function setLoading(btnId, on, label) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = on;
+    btn.innerHTML = on ? `<span class="spinner"></span>${label}` : label;
+  }
+  function setProgress(step) {
+    document.getElementById('progressFill').style.width = step >= 2 ? '100%' : '50%';
+    document.getElementById('label1').classList.toggle('active', step < 2);
+    document.getElementById('label2').classList.toggle('active', step >= 2);
+  }
+  function goToStep(id) {
+    ['step1','step2','successScreen'].forEach(s => {
+      const el = document.getElementById(s);
+      el.classList.remove('active'); el.style.display = 'none';
+    });
+    const t = document.getElementById(id);
+    t.style.display = 'block';
+    requestAnimationFrame(() => t.classList.add('active'));
+  }
+  function goBack() { clearInterval(cdTimer); setProgress(1); goToStep('step1'); }
+
+  function startCountdown(secs = 30) {
+    clearInterval(cdTimer);
+    const cd = document.getElementById('countdown');
+    const rb = document.getElementById('resendBtn');
+    const tw = document.getElementById('timerWrap');
+    let r = secs; rb.disabled = true; tw.style.visibility = 'visible'; cd.textContent = r;
+    cdTimer = setInterval(() => {
+      r--; cd.textContent = r;
+      if (r <= 0) { clearInterval(cdTimer); tw.style.visibility = 'hidden'; rb.disabled = false; }
+    }, 1000);
+  }
+
+  async function sendOtp() {
+    hideMsg('msg1');
+    const name  = document.getElementById('username').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    if (!name)  { showMsg('msg1', 'Please enter your full name.', 'error'); return; }
+    if (!phone) { showMsg('msg1', 'Please enter your mobile number.', 'error'); return; }
+    const clean = normalizePhone(phone);
+    if (!/^[6-9]\d{9}$/.test(clean)) { showMsg('msg1', 'Enter a valid 10-digit Indian mobile number.', 'error'); return; }
+    setLoading('sendOtpBtn', true, 'Sending…');
+    try {
+      const res  = await fetch('/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: clean }) });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('phoneMask').textContent = '+91 ' + clean.slice(0,5) + ' ' + clean.slice(5);
+        setProgress(2); goToStep('step2'); startCountdown(30);
+        setTimeout(() => otpInputs[0].focus(), 150);
+      } else { showMsg('msg1', data.message || 'Could not send OTP. Try again.', 'error'); }
+    } catch { showMsg('msg1', 'Network error. Check your connection.', 'error'); }
+    finally  { setLoading('sendOtpBtn', false, 'Continue'); }
+  }
+
+  async function resendOtp() {
+    const clean = normalizePhone(document.getElementById('phone').value);
+    document.getElementById('resendBtn').disabled = true;
+    try {
+      const res  = await fetch('/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: clean }) });
+      const data = await res.json();
+      if (data.success) {
+        showMsg('msg2', 'New code sent!', 'success'); startCountdown(30);
+        otpInputs.forEach(i => { i.value = ''; i.classList.remove('filled'); }); otpInputs[0].focus();
+      } else { showMsg('msg2', data.message || 'Could not resend.', 'error'); document.getElementById('resendBtn').disabled = false; }
+    } catch { showMsg('msg2', 'Network error. Try again.', 'error'); document.getElementById('resendBtn').disabled = false; }
+  }
+
+  async function verifyOtp() {
+    hideMsg('msg2');
+    const otp = getOtp();
+    if (otp.length < 6) { showMsg('msg2', 'Enter all 6 digits of your code.', 'error'); return; }
+    const payload = { username: document.getElementById('username').value.trim(), phone: normalizePhone(document.getElementById('phone').value), otp };
+    setLoading('verifyBtn', true, 'Verifying…');
+    try {
+      const res  = await fetch('/verify-otp-and-register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const data = await res.json();
+      const firstName = payload.username.split(' ')[0].toUpperCase();
+
+      if (data.success) {
+        // Fresh registration
+        document.getElementById('welcomeName').textContent = firstName;
+        document.getElementById('successTitle').innerHTML  = 'WELCOME<br><span style="color:var(--orange)">' + firstName + '</span>';
+        document.getElementById('successBody').innerHTML   = 'Your account is verified and ready.<br>You\'re now part of the Harsha AVK community.';
+        document.getElementById('successPills').style.display = 'flex';
+        clearInterval(cdTimer); setProgress(3); goToStep('successScreen');
+
+      } else if (data.alreadyRegistered) {
+        // Already registered at this building
+        document.getElementById('successTitle').innerHTML  = 'ALREADY<br><span style="color:var(--orange)">JOINED</span>';
+        document.getElementById('successBody').innerHTML   = 'You\'re already registered at Harsha AVK.<br>Head over to Droppoint to continue.';
+        document.getElementById('successPills').style.display = 'none';
+        clearInterval(cdTimer); setProgress(3); goToStep('successScreen');
+
+      } else {
+        showMsg('msg2', data.message || 'Verification failed. Try again.', 'error');
+      }
+    } catch { showMsg('msg2', 'Network error. Check your connection.', 'error'); }
+    finally  { setLoading('verifyBtn', false, 'Verify & Register'); }
+  }
+
+  document.getElementById('phone').addEventListener('keydown', e => { if (e.key === 'Enter') sendOtp(); });
+  setProgress(1);
+</script>
+</body>
+</html>
