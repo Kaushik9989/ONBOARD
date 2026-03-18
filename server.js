@@ -39,6 +39,9 @@ app.get("/", async (req, res) => {
   res.render("onboard");
 });
 
+app.get("/avk-harsha", async (req, res) => {
+  res.render("onboard");
+});
 // SEND OTP
 app.post("/send-otp", async (req, res) => {
   try {
