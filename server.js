@@ -6,84 +6,49 @@ const app = express();
 const path = require("path");
 const mongoose = require("mongoose");
 
-// ── DB ──────────────────────────────────────────────────────────────
-const mongo_uri = process.env.mongo_uri;
 mongoose
-  .connect(mongo_uri)
+  .connect(process.env.mongo_uri)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// ── Middleware ───────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// ── Twilio ───────────────────────────────────────────────────────────
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
 
-// ── Helper: strip any leading +91 or 91 so we never double-prefix ───
 function normalizePhone(raw) {
-  return String(raw)
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/^\+91/, "")   // removes +91 prefix
-    .replace(/^91(?=\d{10}$)/, ""); // removes bare 91 prefix if followed by 10 digits
+  return String(raw).trim().replace(/\s+/g, "")
+    .replace(/^\+91/, "")
+    .replace(/^91(?=\d{10}$)/, "");
 }
 
-// ── Routes ───────────────────────────────────────────────────────────
-app.get("/", async (req, res) => {
-  res.render("onboard");
-});
+app.get("/", async (req, res) => res.render("onboard"));
+app.get("/avk-harsha", async (req, res) => res.render("onboard"));
 
-app.get("/avk-harsha", async (req, res) => {
-  res.render("onboard");
-});
 // SEND OTP
 app.post("/send-otp", async (req, res) => {
   try {
     const { phone } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number is required",
-      });
-    }
+    if (!phone) return res.status(400).json({ success: false, message: "Phone number is required" });
 
     const cleanPhone = normalizePhone(phone);
-
-    // Validate it's a 10-digit Indian mobile number
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please enter a valid 10-digit Indian mobile number",
-      });
+      return res.status(400).json({ success: false, message: "Please enter a valid 10-digit Indian mobile number" });
     }
 
-    // Always send OTP regardless — upsert happens on verify
     const verification = await twilioClient.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verifications.create({
-        to: `+91${cleanPhone}`,
-        channel: "sms",
-      });
+      .verifications.create({ to: `+91${cleanPhone}`, channel: "sms" });
 
-    return res.json({
-      success: true,
-      message: "OTP sent successfully",
-      status: verification.status,
-    });
+    return res.json({ success: true, message: "OTP sent successfully", status: verification.status });
   } catch (error) {
     console.error("Send OTP Error:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to send OTP. Please try again.",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Failed to send OTP. Please try again.", error: error.message });
   }
 });
 
@@ -91,92 +56,88 @@ app.post("/send-otp", async (req, res) => {
 app.post("/verify-otp-and-register", async (req, res) => {
   try {
     const { username, phone, otp } = req.body;
-
     if (!username || !phone || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, phone, and OTP are all required",
-      });
+      return res.status(400).json({ success: false, message: "Name, phone, and OTP are all required" });
     }
 
     const cleanPhone = normalizePhone(phone);
-
-    // Validate phone again server-side
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid phone number format",
-      });
+      return res.status(400).json({ success: false, message: "Invalid phone number format" });
     }
 
-    // Verify OTP with Twilio first
+    // Verify OTP first
     const verificationCheck = await twilioClient.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks.create({
-        to: `+91${cleanPhone}`,
-        code: otp,
-      });
+      .verificationChecks.create({ to: `+91${cleanPhone}`, code: otp });
 
     if (verificationCheck.status !== "approved") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired OTP. Please try again.",
-      });
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP. Please try again." });
     }
 
-    // Check if user already exists AND is already registered at this building
+    const THIS_BUILDING = "Harsha AVK";
     const existingUser = await User.findOne({ phone: cleanPhone });
-    if (existingUser && existingUser.building === "Harsha AVK") {
+
+    if (existingUser) {
+      // building is an array — safely coerce old string values too
+      const buildings = Array.isArray(existingUser.building)
+        ? existingUser.building
+        : existingUser.building
+          ? [existingUser.building]
+          : [];
+
+      if (buildings.includes(THIS_BUILDING)) {
+        // Already at this building — return full list
+        return res.status(200).json({
+          success: false,
+          alreadyRegistered: true,
+          message: "You are already registered at Harsha AVK.",
+          buildings: buildings,
+        });
+      }
+
+      // Exists but not at this building — add it
+      const updatedUser = await User.findOneAndUpdate(
+        { phone: cleanPhone },
+        {
+          $set: { username: username.trim(), isPhoneVerified: true, verified: true },
+          $addToSet: { building: THIS_BUILDING },
+        },
+        { new: true }
+      );
+
+      const updatedBuildings = Array.isArray(updatedUser.building)
+        ? updatedUser.building
+        : updatedUser.building ? [updatedUser.building] : [];
+
       return res.status(200).json({
-        success: false,
-        alreadyRegistered: true,
-        message: "You are already registered at Harsha AVK.",
+        success: true,
+        message: "Building added to your account.",
+        buildings: updatedBuildings,
+        user: { id: updatedUser._id, username: updatedUser.username, phone: updatedUser.phone },
       });
     }
 
-    // Upsert: update existing user (different/no building) OR create new one
-    const user = await User.findOneAndUpdate(
-      { phone: cleanPhone },
-      {
-        $set: {
-          username: username.trim(),
-          building: "Harsha AVK",
-          isPhoneVerified: true,
-          verified: true,
-          role: "user",
-        },
-        $setOnInsert: {
-          phone: cleanPhone,
-        },
-      },
-      {
-        upsert: true,       // create if not found
-        new: true,          // return updated doc
-        runValidators: true,
-      }
-    );
+    // Brand new user
+    const user = await User.create({
+      username: username.trim(),
+      phone: cleanPhone,
+      building: [THIS_BUILDING],
+      isPhoneVerified: true,
+      verified: true,
+      role: "user",
+    });
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        phone: user.phone,
-        building: user.building,
-      },
+      buildings: Array.isArray(user.building) ? user.building : [user.building],
+      user: { id: user._id, username: user.username, phone: user.phone },
     });
+
   } catch (error) {
-    console.error("Verify/Register Error:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "Registration failed. Please try again.",
-      error: error.message,
-    });
+    console.error("Verify/Register Error:", error.stack);
+    return res.status(500).json({ success: false, message: "Registration failed. Please try again.", error: error.message });
   }
 });
 
-// ── Start ────────────────────────────────────────────────────────────
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
-});
+app.listen(3000, () => console.log("Server running on port 3000"));

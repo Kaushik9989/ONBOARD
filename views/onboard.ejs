@@ -503,18 +503,23 @@
       <!-- Success -->
       <div class="step" id="successScreen">
         <div class="success-wrap">
-          <div class="success-ring" id="successRing">
+          <div class="success-ring">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ff6b1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline id="successIcon" points="20 6 9 17 4 12"/>
             </svg>
           </div>
           <div class="success-title" id="successTitle">WELCOME<br><span id="welcomeName"></span></div>
-          <p class="success-body" id="successBody">Your account is verified and ready.<br>You're now part of the Harsha AVK community.</p>
-          <div class="meta-pills" id="successPills">
-            <div class="meta-pill"><span class="dot"></span>Verified resident</div>
-            <div class="meta-pill"><span class="dot"></span>Harsha AVK</div>
+          <p class="success-body" id="successBody">Your account is verified and ready.</p>
+
+          <!-- buildings label -->
+          <div id="buildingsLabel" style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--w30);margin-top:18px;margin-bottom:8px;">
+            Your Buildings
           </div>
-          <a href="https://droppoint-ui.onrender.com/" class="btn btn-explore">Explore Droppoint →</a>
+
+          <!-- dynamic building pills -->
+          <div class="meta-pills" id="buildingPills"></div>
+
+          <a href="https://demo.droppoint.in" class="btn btn-explore">Explore Droppoint →</a>
         </div>
       </div>
 
@@ -642,6 +647,13 @@
     } catch { showMsg('msg2', 'Network error. Try again.', 'error'); document.getElementById('resendBtn').disabled = false; }
   }
 
+  function renderBuildings(buildings) {
+    const container = document.getElementById('buildingPills');
+    container.innerHTML = (buildings || []).map(b =>
+      `<div class="meta-pill"><span class="dot"></span>${b}</div>`
+    ).join('');
+  }
+
   async function verifyOtp() {
     hideMsg('msg2');
     const otp = getOtp();
@@ -654,18 +666,15 @@
       const firstName = payload.username.split(' ')[0].toUpperCase();
 
       if (data.success) {
-        // Fresh registration
-        document.getElementById('welcomeName').textContent = firstName;
-        document.getElementById('successTitle').innerHTML  = 'WELCOME<br><span style="color:var(--orange)">' + firstName + '</span>';
-        document.getElementById('successBody').innerHTML   = 'Your account is verified and ready.<br>You\'re now part of the Harsha AVK community.';
-        document.getElementById('successPills').style.display = 'flex';
+        document.getElementById('successTitle').innerHTML = 'WELCOME<br><span style="color:var(--orange)">' + firstName + '</span>';
+        document.getElementById('successBody').textContent = 'Your account is verified and ready.';
+        renderBuildings(data.buildings);
         clearInterval(cdTimer); setProgress(3); goToStep('successScreen');
 
       } else if (data.alreadyRegistered) {
-        // Already registered at this building
-        document.getElementById('successTitle').innerHTML  = 'ALREADY<br><span style="color:var(--orange)">JOINED</span>';
-        document.getElementById('successBody').innerHTML   = 'You\'re already registered at Harsha AVK.<br>Head over to Droppoint to continue.';
-        document.getElementById('successPills').style.display = 'none';
+        document.getElementById('successTitle').innerHTML = 'ALREADY<br><span style="color:var(--orange)">JOINED</span>';
+        document.getElementById('successBody').textContent = 'You\'re already registered at these buildings.';
+        renderBuildings(data.buildings);
         clearInterval(cdTimer); setProgress(3); goToStep('successScreen');
 
       } else {
