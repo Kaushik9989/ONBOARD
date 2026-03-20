@@ -52,22 +52,18 @@ app.post("/send-otp", async (req, res) => {
   }
 });
 
-
-
-// VERIFY OTP + REGISTER
-app.post("/verify-otp-and-register", async (req, res) => {
+// VERIFY OTP — checks if user exists, returns existing user info or signals new user
+app.post("/verify-otp", async (req, res) => {
   try {
-    const { username, phone, otp } = req.body;
-    if (!username || !phone || !otp) {
-      return res.status(400).json({ success: false, message: "Name, phone, and OTP are all required" });
-    }  
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ success: false, message: "Phone and OTP are required" });
 
     const cleanPhone = normalizePhone(phone);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
       return res.status(400).json({ success: false, message: "Invalid phone number format" });
     }
 
-    // Verify OTP first
+    // Verify OTP with Twilio
     const verificationCheck = await twilioClient.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
       .verificationChecks.create({ to: `+91${cleanPhone}`, code: otp });
@@ -80,46 +76,64 @@ app.post("/verify-otp-and-register", async (req, res) => {
     const existingUser = await User.findOne({ phone: cleanPhone });
 
     if (existingUser) {
-      // building is an array — safely coerce old string values too
       const buildings = Array.isArray(existingUser.building)
         ? existingUser.building
-        : existingUser.building
-          ? [existingUser.building]
-          : [];
+        : existingUser.building ? [existingUser.building] : [];
 
-      if (buildings.includes(THIS_BUILDING)) {
-        // Already at this building — return full list
-        return res.status(200).json({
-          success: false,
-          alreadyRegistered: true,
-          message: "You are already registered at Harsha AVK.",
-          buildings: buildings,
-        });
+      const alreadyHere = buildings.includes(THIS_BUILDING);
+
+      // Add building if not already there
+      if (!alreadyHere) {
+        await User.findOneAndUpdate(
+          { phone: cleanPhone },
+          { $addToSet: { building: THIS_BUILDING }, $set: { isPhoneVerified: true, verified: true } }
+        );
+        buildings.push(THIS_BUILDING);
       }
-
-      // Exists but not at this building — add it
-      const updatedUser = await User.findOneAndUpdate(
-        { phone: cleanPhone },
-        {
-          $set: { username: username.trim(), isPhoneVerified: true, verified: true },
-          $addToSet: { building: THIS_BUILDING },
-        },
-        { new: true }
-      );
-
-      const updatedBuildings = Array.isArray(updatedUser.building)
-        ? updatedUser.building
-        : updatedUser.building ? [updatedUser.building] : [];
 
       return res.status(200).json({
         success: true,
-        message: "Building added to your account.",
-        buildings: updatedBuildings,
-        user: { id: updatedUser._id, username: updatedUser.username, phone: updatedUser.phone },
+        isExisting: true,
+        alreadyRegistered: alreadyHere,
+        username: existingUser.username,
+        buildings,
+        user: { id: existingUser._id, phone: cleanPhone },
       });
     }
 
-    // Brand new user
+    // New user — OTP verified, signal frontend to collect name
+    return res.status(200).json({
+      success: true,
+      isExisting: false,
+      phone: cleanPhone,
+    });
+
+  } catch (error) {
+    console.error("Verify OTP Error:", error.stack);
+    return res.status(500).json({ success: false, message: "Verification failed. Please try again.", error: error.message });
+  }
+});
+
+// REGISTER — only called for new users after name is collected
+app.post("/register", async (req, res) => {
+  try {
+    const { username, phone } = req.body;
+    if (!username || !phone) return res.status(400).json({ success: false, message: "Name and phone are required" });
+
+    const cleanPhone = normalizePhone(phone);
+    const THIS_BUILDING = "AVK Harsha";
+
+    // Guard: don't double-create
+    const existing = await User.findOne({ phone: cleanPhone });
+    if (existing) {
+      const buildings = Array.isArray(existing.building) ? existing.building : existing.building ? [existing.building] : [];
+      if (!buildings.includes(THIS_BUILDING)) {
+        await User.findOneAndUpdate({ phone: cleanPhone }, { $addToSet: { building: THIS_BUILDING } });
+        buildings.push(THIS_BUILDING);
+      }
+      return res.status(200).json({ success: true, username: existing.username, buildings });
+    }
+
     const user = await User.create({
       username: username.trim(),
       phone: cleanPhone,
@@ -131,13 +145,13 @@ app.post("/verify-otp-and-register", async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      username: user.username,
       buildings: Array.isArray(user.building) ? user.building : [user.building],
-      user: { id: user._id, username: user.username, phone: user.phone },
+      user: { id: user._id },
     });
 
   } catch (error) {
-    console.error("Verify/Register Error:", error.stack);
+    console.error("Register Error:", error.stack);
     return res.status(500).json({ success: false, message: "Registration failed. Please try again.", error: error.message });
   }
 });
