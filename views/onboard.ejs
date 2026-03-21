@@ -144,7 +144,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-name">AVK Harsha</div>
+<div class="brand-name"><%= partner.partnerName %></div>
           <div class="brand-sub">Resident Portal</div>
         </div>
       </div>
@@ -239,7 +239,9 @@
     </div>
   </div>
 </div>
-
+<script>
+  const partnerId = "<%= partner._id %>";
+</script>
 <script>
   /* particles */
   for (let i = 0; i < 14; i++) {
@@ -320,7 +322,7 @@
     document.getElementById('successBody').textContent = isExisting
       ? 'Great to see you again. You\'re all set.'
       : 'Your account is verified and ready.';
-    renderBuildings(buildings);
+    renderBuildings([ "<%= partner.partnerName %>" ])
     clearInterval(cdTimer);
     goToStep('step4', 4);
   }
@@ -363,12 +365,20 @@
     if (otp.length < 6) { showMsg('msg2', 'Enter all 6 digits.', 'error'); return; }
     setLoading('verifyBtn', true, 'Verifying…');
     try {
-      const res = await fetch('/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: verifiedPhone, otp }) });
+   const res = await fetch('/verify-otp', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    phone: verifiedPhone,
+    otp,
+    partnerId   // 🔥 add this
+  })
+});
       const data = await res.json();
       if (data.success) {
         if (data.isExisting) {
           // Existing user — go straight to success
-          showSuccess(data.username, data.buildings, true);
+          showSuccess(data.username, data.partners, true);
         } else {
           // New user — ask for name
           goToStep('step3', 3);
@@ -385,10 +395,18 @@
     if (!username) { showMsg('msg3', 'Please enter your full name.', 'error'); return; }
     setLoading('registerBtn', true, 'Joining…');
     try {
-      const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, phone: verifiedPhone }) });
+    const res = await fetch('/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username,
+    phone: verifiedPhone,
+    partnerId   // 🔥 add this
+  })
+});
       const data = await res.json();
       if (data.success) {
-        showSuccess(data.username, data.buildings, false);
+        showSuccess(data.username, data.partners, false);
       } else { showMsg('msg3', data.message || 'Registration failed.', 'error'); }
     } catch { showMsg('msg3', 'Network error. Check your connection.', 'error'); }
     finally { setLoading('registerBtn', false, 'Join Now'); }

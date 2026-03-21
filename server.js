@@ -5,7 +5,7 @@ const twilio = require("twilio");
 const app = express();
 const path = require("path");
 const mongoose = require("mongoose");
-
+const LocationPartner = require("./models/LocationPartnerSchema")
 mongoose
   .connect(process.env.mongo_uri)
   .then(() => console.log("MongoDB connected"))
@@ -26,9 +26,6 @@ function normalizePhone(raw) {
     .replace(/^\+91/, "")
     .replace(/^91(?=\d{10}$)/, "");
 }
-
-app.get("/", async (req, res) => res.render("onboard"));
-app.get("/avk-harsha", async (req, res) => res.render("onboard"));
 
 // SEND OTP
 app.post("/send-otp", async (req, res) => {
@@ -55,105 +52,130 @@ app.post("/send-otp", async (req, res) => {
 // VERIFY OTP — checks if user exists, returns existing user info or signals new user
 app.post("/verify-otp", async (req, res) => {
   try {
-    const { phone, otp } = req.body;
-    if (!phone || !otp) return res.status(400).json({ success: false, message: "Phone and OTP are required" });
+    const { phone, otp, partnerId } = req.body;
 
-    const cleanPhone = normalizePhone(phone);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      return res.status(400).json({ success: false, message: "Invalid phone number format" });
+    if (!phone || !otp || !partnerId) {
+      return res.status(400).json({ success: false, message: "Phone, OTP and partnerId are required" });
     }
 
-    // Verify OTP with Twilio
+    const cleanPhone = normalizePhone(phone);
+
+    const partner = await LocationPartner.findById(partnerId);
+    if (!partner) {
+      return res.status(400).json({ success: false, message: "Invalid partner" });
+    }
+
     const verificationCheck = await twilioClient.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
       .verificationChecks.create({ to: `+91${cleanPhone}`, code: otp });
 
     if (verificationCheck.status !== "approved") {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP. Please try again." });
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
 
-    const THIS_BUILDING = "AVK Harsha";
     const existingUser = await User.findOne({ phone: cleanPhone });
 
     if (existingUser) {
-      const buildings = Array.isArray(existingUser.building)
-        ? existingUser.building
-        : existingUser.building ? [existingUser.building] : [];
+     const alreadyLinked = existingUser.locationPartners.some(
+  id => id.toString() === partner._id.toString()
+);
 
-      const alreadyHere = buildings.includes(THIS_BUILDING);
-
-      // Add building if not already there
-      if (!alreadyHere) {
-        await User.findOneAndUpdate(
-          { phone: cleanPhone },
-          { $addToSet: { building: THIS_BUILDING }, $set: { isPhoneVerified: true, verified: true } }
-        );
-        buildings.push(THIS_BUILDING);
+      if (!alreadyLinked) {
+        await User.findByIdAndUpdate(existingUser._id, {
+          $addToSet: { locationPartners: partner._id },
+          $set: { isPhoneVerified: true, verified: true }
+        });
       }
 
-      return res.status(200).json({
-        success: true,
-        isExisting: true,
-        alreadyRegistered: alreadyHere,
-        username: existingUser.username,
-        buildings,
-        user: { id: existingUser._id, phone: cleanPhone },
-      });
+const updatedUser = await User.findById(existingUser._id)
+  .populate("locationPartners", "partnerName");
+
+const allPartners = updatedUser.locationPartners.map(p => p.partnerName);
+
+return res.json({
+  success: true,
+  isExisting: true,
+  username: updatedUser.username,
+  partners: allPartners,
+  user: { id: updatedUser._id }
+});
     }
 
-    // New user — OTP verified, signal frontend to collect name
-    return res.status(200).json({
+    return res.json({
       success: true,
       isExisting: false,
-      phone: cleanPhone,
+      phone: cleanPhone
     });
 
   } catch (error) {
-    console.error("Verify OTP Error:", error.stack);
-    return res.status(500).json({ success: false, message: "Verification failed. Please try again.", error: error.message });
+    console.error(error);
+    res.status(500).json({ success: false, message: "Verification failed" });
   }
 });
-
 // REGISTER — only called for new users after name is collected
+
 app.post("/register", async (req, res) => {
   try {
-    const { username, phone } = req.body;
-    if (!username || !phone) return res.status(400).json({ success: false, message: "Name and phone are required" });
+    const { username, phone, partnerId } = req.body;
+
+    if (!username || !phone || !partnerId) {
+      return res.status(400).json({ success: false, message: "All fields required" });
+    }
 
     const cleanPhone = normalizePhone(phone);
-    const THIS_BUILDING = "AVK Harsha";
 
-    // Guard: don't double-create
+    const partner = await LocationPartner.findById(partnerId);
+    if (!partner) {
+      return res.status(400).json({ success: false, message: "Invalid partner" });
+    }
+
     const existing = await User.findOne({ phone: cleanPhone });
+
     if (existing) {
-      const buildings = Array.isArray(existing.building) ? existing.building : existing.building ? [existing.building] : [];
-      if (!buildings.includes(THIS_BUILDING)) {
-        await User.findOneAndUpdate({ phone: cleanPhone }, { $addToSet: { building: THIS_BUILDING } });
-        buildings.push(THIS_BUILDING);
-      }
-      return res.status(200).json({ success: true, username: existing.username, buildings });
+      await User.findByIdAndUpdate(existing._id, {
+        $addToSet: { locationPartners: partner._id }
+      });
+
+const updatedUser = await User.findById(existing._id)
+  .populate("locationPartners", "partnerName");
+
+const allPartners = updatedUser.locationPartners.map(p => p.partnerName);
+
+return res.json({
+  success: true,
+  username: updatedUser.username,
+  partners: allPartners
+});
     }
 
     const user = await User.create({
       username: username.trim(),
       phone: cleanPhone,
-      building: [THIS_BUILDING],
+      locationPartners: [partner._id],
       isPhoneVerified: true,
       verified: true,
-      role: "user",
+      role: "user"
     });
 
     return res.status(201).json({
       success: true,
       username: user.username,
-      buildings: Array.isArray(user.building) ? user.building : [user.building],
-      user: { id: user._id },
+      partners: [partner.partnerName],
+      user: { id: user._id }
     });
 
   } catch (error) {
-    console.error("Register Error:", error.stack);
-    return res.status(500).json({ success: false, message: "Registration failed. Please try again.", error: error.message });
+    console.error(error);
+    res.status(500).json({ success: false, message: "Registration failed" });
   }
 });
+app.get("/:slug", async (req, res) => {
+  const { slug } = req.params;
 
+  const partner = await LocationPartner.findOne({ slug });
+
+  if (!partner) return res.status(404).send("Invalid onboarding link");
+
+  res.render("onboard", { partner });
+});
 app.listen(3000, () => console.log("Server running on port 3000"));
